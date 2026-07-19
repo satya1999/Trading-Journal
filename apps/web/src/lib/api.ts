@@ -1,31 +1,8 @@
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+export const CONVEX_URL =
+  process.env.NEXT_PUBLIC_CONVEX_URL ?? "https://careful-duck-681.convex.cloud";
 
-/** The URL baked into the EA. MT5's WebRequest frequently fails to resolve
- *  "localhost", so a local server address is rewritten to 127.0.0.1. */
-export const EA_API_URL = API_URL.replace("//localhost", "//127.0.0.1");
-
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(API_URL + path, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
-    ...init,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text || res.statusText);
-  }
-  return (await res.json()) as T;
-}
+export const EA_API_URL =
+  process.env.NEXT_PUBLIC_CONVEX_SITE_URL ?? "https://careful-duck-681.convex.site";
 
 export const fmtMoney = (n: number | null | undefined, currency = "USD") =>
   n == null

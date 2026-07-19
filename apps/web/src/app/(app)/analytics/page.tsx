@@ -151,11 +151,31 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
           <SymbolChart data={data} />
         </ChartCard>
         <ChartCard
+          title="Session performance"
+          subtitle="Net P/L by market session (UTC)"
+        >
+          <SessionChart data={data} />
+        </ChartCard>
+        <ChartCard
+          title="Holding time analysis"
+          subtitle="Win rate & P/L relative to trade duration"
+        >
+          <DurationChart data={data} />
+        </ChartCard>
+        <ChartCard
           title="R-multiple distribution"
           subtitle="How your results spread against risk (needs a stop loss)"
         >
           <RRChart data={data} />
         </ChartCard>
+      </section>
+
+      <section className="mt-4">
+        <Card className="anim-fade-up">
+          <h3 className="text-sm font-semibold">Strategy & Setup Performance</h3>
+          <p className="mb-3 text-xs text-muted">Win rate and risk ratios per tagged playbook</p>
+          <StrategyTable data={data} />
+        </Card>
       </section>
     </>
   );
@@ -367,5 +387,123 @@ function RRChart({ data }: { data: AnalyticsBreakdown }) {
   );
   return (
     <EChart option={option} ariaLabel="Distribution of R multiples across closed trades" />
+  );
+}
+
+function SessionChart({ data }: { data: AnalyticsBreakdown }) {
+  const option = useMemo<EChartsOption>(() => {
+    const ordered = [...data.bySession].reverse();
+    return {
+      tooltip: baseTooltip,
+      grid: { left: 8, right: 48, top: 8, bottom: 8, containLabel: true },
+      xAxis: axis.value(),
+      yAxis: {
+        ...axis.category(ordered.map((r) => r.session)),
+        axisLabel: { color: CH.ink2, fontSize: 11 },
+      },
+      series: [
+        {
+          name: "Net P/L",
+          type: "bar" as const,
+          barMaxWidth: 16,
+          label: {
+            show: true,
+            position: "right" as const,
+            color: CH.ink2,
+            fontSize: 11,
+            formatter: (p: { value: unknown }) => moneyFmt(p.value),
+          },
+          data: ordered.map((r) => ({
+            value: r.pnl,
+            itemStyle: {
+              color: r.pnl >= 0 ? CH.pos : CH.neg,
+              borderRadius: r.pnl >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4],
+            },
+          })),
+        },
+      ],
+    };
+  }, [data]);
+  return <EChart option={option} height={200} ariaLabel="Net profit and loss by market session" />;
+}
+
+function DurationChart({ data }: { data: AnalyticsBreakdown }) {
+  const option = useMemo<EChartsOption>(
+    () => ({
+      tooltip: baseTooltip,
+      grid: { left: 8, right: 8, top: 14, bottom: 8, containLabel: true },
+      xAxis: axis.category(data.byDuration.map((d) => d.bucket)),
+      yAxis: axis.value(),
+      series: [
+        {
+          name: "Net P/L",
+          type: "bar" as const,
+          barMaxWidth: 26,
+          data: data.byDuration.map((d) => ({
+            value: d.pnl,
+            itemStyle: {
+              color: d.pnl >= 0 ? CH.pos : CH.neg,
+              borderRadius: d.pnl >= 0 ? [4, 4, 0, 0] : [0, 0, 4, 4],
+            },
+          })),
+        },
+      ],
+    }),
+    [data],
+  );
+  return <EChart option={option} height={220} ariaLabel="Net profit and loss by holding duration" />;
+}
+
+function StrategyTable({ data }: { data: AnalyticsBreakdown }) {
+  const all = useMemo(() => {
+    const list: { name: string; type: "Strategy" | "Setup"; pnl: number; trades: number; wins: number; avgRR: number | null }[] = [];
+    data.byStrategy.forEach((s) => list.push({ name: s.name, type: "Strategy", pnl: s.pnl, trades: s.trades, wins: s.wins, avgRR: s.avgRR }));
+    data.bySetup.forEach((s) => list.push({ name: s.name, type: "Setup", pnl: s.pnl, trades: s.trades, wins: s.wins, avgRR: s.avgRR }));
+    return list.sort((a, b) => b.pnl - a.pnl);
+  }, [data]);
+
+  if (all.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted">
+        No tagged strategies or setups yet. Add tags in your Trade Journal notes!
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm tabular-nums">
+        <thead>
+          <tr className="border-b bg-white/[0.03] text-left text-[10px] tracking-wide text-muted uppercase">
+            <th className="px-4 py-2 font-medium">Name</th>
+            <th className="px-2 py-2 font-medium">Type</th>
+            <th className="px-2 py-2 text-right font-medium">Win Rate</th>
+            <th className="px-2 py-2 text-right font-medium">Avg R</th>
+            <th className="px-2 py-2 text-right font-medium">Trades</th>
+            <th className="px-4 py-2 text-right font-medium">Net P/L</th>
+          </tr>
+        </thead>
+        <tbody>
+          {all.map((item) => (
+            <tr key={`${item.type}-${item.name}`} className="border-b border-grid last:border-0 hover:bg-surface-2/40">
+              <td className="px-4 py-2 font-medium">{item.name}</td>
+              <td className="px-2 py-2">
+                <span className={clsx("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", item.type === "Strategy" ? "bg-accent/10 text-accent" : "bg-series-2/10 text-good")}>
+                  {item.type}
+                </span>
+              </td>
+              <td className="px-2 py-2 text-right">
+                {item.trades ? `${((item.wins / item.trades) * 100).toFixed(0)}%` : "—"}
+              </td>
+              <td className="px-2 py-2 text-right">{fmtNum(item.avgRR)}</td>
+              <td className="px-2 py-2 text-right text-ink-2">{item.trades}</td>
+              <td className={clsx("px-4 py-2 text-right font-semibold", item.pnl > 0 && "text-good", item.pnl < 0 && "text-bad")}>
+                {fmtSigned(item.pnl)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

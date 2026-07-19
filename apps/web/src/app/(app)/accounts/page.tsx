@@ -1,6 +1,7 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useAction } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import clsx from "clsx";
 import {
   Cable,
@@ -20,31 +21,47 @@ import {
   Skeleton,
   Spinner,
 } from "@/components/ui";
-import { EA_API_URL, api, fmtMoney } from "@/lib/api";
+import { EA_API_URL, fmtMoney } from "@/lib/api";
 import { AccountWithLabel, useAccounts } from "@/lib/queries";
 
 export default function AccountsPage() {
   const [wizard, setWizard] = useState<{ id: string; token: string } | null>(
     null,
   );
-  // While the wizard waits for the EA's first handshake, poll every 4s.
-  const { data: accounts, isLoading } = useAccounts({
-    refetchInterval: wizard ? 4000 : 30_000,
-  });
-  const queryClient = useQueryClient();
+  const { data: accounts, isLoading } = useAccounts();
 
-  const reconnect = useMutation({
-    mutationFn: (id: string) =>
-      api<{ syncToken: string }>(`/accounts/${id}/rotate-token`, {
-        method: "POST",
-      }),
-    onSuccess: (data, id) => setWizard({ id, token: data.syncToken }),
-  });
+  const rotateTokenAction = useAction(api.accountsActions.rotateToken);
+  const [reconnectingId, setReconnectingId] = useState<string | null>(null);
 
-  const remove = useMutation({
-    mutationFn: (id: string) => api(`/accounts/${id}`, { method: "DELETE" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts"] }),
-  });
+  const handleReconnect = async (id: any) => {
+    setReconnectingId(id);
+    try {
+      const token = localStorage.getItem("tm_session_token") || "";
+      const result = await rotateTokenAction({ token, id });
+      setWizard({ id, token: result.syncToken });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReconnectingId(null);
+    }
+  };
+
+  const deleteAccount = useMutation(api.accounts.remove);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (id: any, label: string) => {
+    if (confirm(`Delete "${label}" and all its synced trades? This cannot be undone.`)) {
+      setDeletingId(id);
+      try {
+        const token = localStorage.getItem("tm_session_token") || "";
+        await deleteAccount({ token, id });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setDeletingId(null);
+      }
+    }
+  };
 
   const wizardAccount = accounts?.find((a) => a.id === wizard?.id);
 
@@ -90,16 +107,9 @@ export default function AccountsPage() {
             <AccountRow
               key={a.id}
               account={a}
-              reconnecting={reconnect.isPending && reconnect.variables === a.id}
-              onReconnect={() => reconnect.mutate(a.id)}
-              onDelete={() => {
-                if (
-                  confirm(
-                    `Delete "${a.label}" and all its synced trades? This cannot be undone.`,
-                  )
-                )
-                  remove.mutate(a.id);
-              }}
+              reconnecting={reconnectingId === a.id}
+              onReconnect={() => handleReconnect(a.id)}
+              onDelete={() => handleDelete(a.id, a.label)}
             />
           ))}
         </div>
@@ -123,22 +133,25 @@ function CreateAccountButton({
 }: {
   onCreated: (id: string, token: string) => void;
 }) {
-  const queryClient = useQueryClient();
   const [label, setLabel] = useState("");
   const [open, setOpen] = useState(false);
-  const create = useMutation({
-    mutationFn: () =>
-      api<{ account: { id: string }; syncToken: string }>("/accounts", {
-        method: "POST",
-        body: JSON.stringify({ label }),
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+  const [busy, setBusy] = useState(false);
+  const createAccount = useAction(api.accountsActions.create);
+
+  const handleCreate = async () => {
+    setBusy(true);
+    try {
+      const token = localStorage.getItem("tm_session_token") || "";
+      const result = await createAccount({ token, label });
       setOpen(false);
       setLabel("");
-      onCreated(data.account.id, data.syncToken);
-    },
-  });
+      onCreated(result.account.id, result.syncToken);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <>
@@ -156,7 +169,7 @@ function CreateAccountButton({
           className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            create.mutate();
+            handleCreate();
           }}
         >
           <Input
@@ -165,8 +178,8 @@ function CreateAccountButton({
             onChange={(e) => setLabel(e.target.value)}
             autoFocus
           />
-          <Button type="submit" disabled={create.isPending}>
-            {create.isPending ? "Creating…" : "Continue to setup"}
+          <Button type="submit" disabled={busy}>
+            {busy ? "Creating…" : "Continue to setup"}
           </Button>
         </form>
       </Dialog>

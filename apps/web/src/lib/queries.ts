@@ -1,24 +1,15 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import {
-  AnalyticsBreakdown,
-  AnalyticsSummary,
-  CalendarDay,
-  EquityPoint,
-  TradeDto,
-  TradingAccountDto,
-} from "@trademind/shared";
-import { api } from "./api";
+import { useQuery as useConvexQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { TradingAccountDto, TradeDto, AnalyticsSummary, EquityPoint, AnalyticsBreakdown, CalendarDay } from "@trademind/shared";
 
 export type AccountWithLabel = TradingAccountDto & { label: string };
 
 export function useAccounts(options?: { refetchInterval?: number }) {
-  return useQuery({
-    queryKey: ["accounts"],
-    queryFn: () => api<AccountWithLabel[]>("/accounts"),
-    refetchInterval: options?.refetchInterval,
-  });
+  const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
+  const data = useConvexQuery(api.accounts.list, { token }) as AccountWithLabel[] | undefined;
+  return { data, isLoading: data === undefined };
 }
 
 export interface TradesPage {
@@ -29,55 +20,38 @@ export interface TradesPage {
 }
 
 export function useTrades(filters: Record<string, string | number | undefined>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(filters)) {
-    if (v !== undefined && v !== "") params.set(k, String(v));
-  }
-  const qs = params.toString();
-  return useQuery({
-    queryKey: ["trades", qs],
-    queryFn: () => api<TradesPage>(`/trades${qs ? `?${qs}` : ""}`),
-  });
+  const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
+  const { accountId, symbol, state, page, pageSize } = filters;
+  const data = useConvexQuery(api.trades.list, {
+    token,
+    accountId: accountId as string | undefined,
+    symbol: symbol as string | undefined,
+    state: state as string | undefined,
+    paginationOpts: { page: Number(page) || 1, pageSize: Number(pageSize) || 25 },
+  }) as TradesPage | undefined;
+  return { data, isLoading: data === undefined };
 }
 
 export function useSummary(accountId?: string) {
-  return useQuery({
-    queryKey: ["summary", accountId ?? "all"],
-    queryFn: () =>
-      api<AnalyticsSummary>(
-        `/analytics/summary${accountId ? `?accountId=${accountId}` : ""}`,
-      ),
-    refetchInterval: 30_000,
-  });
+  const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
+  const data = useConvexQuery(api.analytics.summary, { token, accountId }) as AnalyticsSummary | undefined;
+  return { data, isLoading: data === undefined };
 }
 
 export function useEquityCurve(accountId?: string) {
-  return useQuery({
-    queryKey: ["equity-curve", accountId ?? "all"],
-    queryFn: () =>
-      api<{ trades: EquityPoint[]; snapshots: EquityPoint[] }>(
-        `/analytics/equity-curve${accountId ? `?accountId=${accountId}` : ""}`,
-      ),
-    refetchInterval: 60_000,
-  });
+  const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
+  const data = useConvexQuery(api.analytics.equityCurve, { token, accountId }) as { trades: EquityPoint[]; snapshots: EquityPoint[] } | undefined;
+  return { data, isLoading: data === undefined };
 }
 
 export function useBreakdown(accountId?: string) {
-  return useQuery({
-    queryKey: ["breakdown", accountId ?? "all"],
-    queryFn: () =>
-      api<AnalyticsBreakdown>(
-        `/analytics/breakdown${accountId ? `?accountId=${accountId}` : ""}`,
-      ),
-    refetchInterval: 60_000,
-  });
+  const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
+  const data = useConvexQuery(api.analytics.breakdown, { token, accountId }) as AnalyticsBreakdown | undefined;
+  return { data, isLoading: data === undefined };
 }
 
 export function useCalendar(month: string, accountId?: string) {
-  const params = new URLSearchParams({ month });
-  if (accountId) params.set("accountId", accountId);
-  return useQuery({
-    queryKey: ["calendar", month, accountId ?? "all"],
-    queryFn: () => api<CalendarDay[]>(`/analytics/calendar?${params}`),
-  });
+  const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
+  const data = useConvexQuery(api.analytics.calendar, { token, month, accountId }) as CalendarDay[] | undefined;
+  return { data, isLoading: data === undefined };
 }

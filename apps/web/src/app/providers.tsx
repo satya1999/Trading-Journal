@@ -2,6 +2,8 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConvexProvider } from "convex/react";
+import { convex } from "@/lib/auth-client";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -12,5 +14,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }),
   );
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <ConvexProvider client={convex}>
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    </ConvexProvider>
+  );
 }
