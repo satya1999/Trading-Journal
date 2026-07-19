@@ -1,12 +1,14 @@
 import {
   AnalyticsBreakdown,
   BucketStat,
+  HeatCell,
   Insight,
+  StreakStats,
   SymbolStat,
   SessionStat,
   StrategyStat,
   DurationBucketStat,
-} from "../../packages/shared/src/index";
+} from "../../../packages/shared/src/index";
 
 export interface ClosedTradeRow {
   symbol: string;
@@ -80,6 +82,17 @@ export function computeBreakdown(trades: ClosedTradeRow[]): AnalyticsBreakdown {
   const rrCounts = new Array(rrBuckets.length).fill(0);
   let noSl = 0;
 
+  // weekday(Mon-first) × hour profit heatmap
+  const heat: HeatCell[] = [];
+  for (let d = 0; d < 7; d++)
+    for (let h = 0; h < 24; h++)
+      heat.push({
+        weekday: WEEKDAYS[d],
+        hour: String(h).padStart(2, "0"),
+        pnl: 0,
+        trades: 0,
+      });
+
   for (const t of trades) {
     const hour = t.openTime.getUTCHours();
     byHour[hour].pnl = round2(byHour[hour].pnl + t.netProfit);
@@ -90,6 +103,10 @@ export function computeBreakdown(trades: ClosedTradeRow[]): AnalyticsBreakdown {
     byWeekday[wd].pnl = round2(byWeekday[wd].pnl + t.netProfit);
     byWeekday[wd].trades++;
     if (t.netProfit > 0) byWeekday[wd].wins++;
+
+    const cell = heat[wd * 24 + hour];
+    cell.pnl = round2(cell.pnl + t.netProfit);
+    cell.trades++;
 
     // Symbol
     const s = symbolMap.get(t.symbol) ?? {
@@ -218,6 +235,22 @@ export function computeBreakdown(trades: ClosedTradeRow[]): AnalyticsBreakdown {
     avgRR: rrN > 0 ? round2(rrSum / rrN) : null,
   }));
 
+  // Win/loss streaks in close-time order (breakeven trades break streaks).
+  const chronological = [...trades].sort(
+    (a, b) => a.closeTime.getTime() - b.closeTime.getTime(),
+  );
+  const streaks: StreakStats = { maxWinStreak: 0, maxLossStreak: 0, currentStreak: 0 };
+  let run = 0;
+  for (const t of chronological) {
+    const sign = t.netProfit > 0 ? 1 : t.netProfit < 0 ? -1 : 0;
+    if (sign === 0) run = 0;
+    else if (Math.sign(run) === sign) run += sign;
+    else run = sign;
+    streaks.maxWinStreak = Math.max(streaks.maxWinStreak, run);
+    streaks.maxLossStreak = Math.max(streaks.maxLossStreak, -run);
+  }
+  streaks.currentStreak = run;
+
   const wins = trades.filter((t) => t.netProfit > 0);
   const losses = trades.filter((t) => t.netProfit < 0);
   const avgWin = wins.length
@@ -240,6 +273,8 @@ export function computeBreakdown(trades: ClosedTradeRow[]): AnalyticsBreakdown {
     byStrategy,
     bySetup,
     byDuration,
+    heatmap: heat,
+    streaks,
     rrHistogram: rrBuckets.map((bucket, i) => ({ bucket, count: rrCounts[i] })),
     avgWin,
     avgLoss,
@@ -249,6 +284,10 @@ export function computeBreakdown(trades: ClosedTradeRow[]): AnalyticsBreakdown {
       byHour,
       byWeekday,
       bySymbol,
+      bySession,
+      byStrategy,
+      byDuration,
+      streaks,
       avgWin,
       avgLoss,
       expectancy,
@@ -263,6 +302,10 @@ function buildInsights(
     byHour: BucketStat[];
     byWeekday: BucketStat[];
     bySymbol: SymbolStat[];
+    bySession: SessionStat[];
+    byStrategy: StrategyStat[];
+    byDuration: DurationBucketStat[];
+    streaks: StreakStats;
     avgWin: number | null;
     avgLoss: number | null;
     expectancy: number | null;
@@ -367,6 +410,61 @@ function buildInsights(
         body: `Days with more than 5 trades average ${money(round2(busyAvg))}, versus ${money(round2(calmAvg))} on calmer days. That gap is usually revenge trading or forced setups — cap your daily trade count.`,
       });
     }
+  }
+
+  // Session edge / leak.
+  const sessions = agg.bySession.filter((s) => s.trades >= MIN_SAMPLE);
+  const bestSession = [...sessions].sort((a, b) => b.pnl - a.pnl)[0];
+  const worstSession = [...sessions].sort((a, b) => a.pnl - b.pnl)[0];
+  if (bestSession && bestSession.pnl > 0) {
+    out.push({
+      tone: "info",
+      title: `You're a ${bestSession.session} session trader`,
+      body: `${money(bestSession.pnl)} over ${bestSession.trades} trades in the ${bestSession.session} session (${((bestSession.wins / bestSession.trades) * 100).toFixed(0)}% win rate). Schedule your screen time around it.`,
+    });
+  }
+  if (worstSession && worstSession.pnl < 0 && worstSession !== bestSession) {
+    out.push({
+      tone: "warning",
+      title: `The ${worstSession.session} session drains you`,
+      body: `${money(worstSession.pnl)} across ${worstSession.trades} trades. If you must trade it, halve your size there and watch whether the leak closes.`,
+    });
+  }
+
+  // Holding-time pattern.
+  const worstDuration = agg.byDuration
+    .filter((d) => d.trades >= MIN_SAMPLE && d.pnl < 0)
+    .sort((a, b) => a.pnl - b.pnl)[0];
+  const bestDuration = agg.byDuration
+    .filter((d) => d.trades >= MIN_SAMPLE && d.pnl > 0)
+    .sort((a, b) => b.pnl - a.pnl)[0];
+  if (worstDuration && bestDuration) {
+    out.push({
+      tone: "info",
+      title: `${bestDuration.bucket} works; ${worstDuration.bucket} doesn't`,
+      body: `${bestDuration.bucket} trades net ${money(bestDuration.pnl)} while ${worstDuration.bucket} trades net ${money(worstDuration.pnl)}. Your holding time is a strategy decision — make it deliberately.`,
+    });
+  }
+
+  // Best tagged strategy — reward journaling with evidence.
+  const bestStrategy = agg.byStrategy
+    .filter((s) => s.trades >= MIN_SAMPLE && s.pnl > 0)
+    .sort((a, b) => b.pnl - a.pnl)[0];
+  if (bestStrategy) {
+    out.push({
+      tone: "good",
+      title: `“${bestStrategy.name}” is your proven playbook`,
+      body: `${money(bestStrategy.pnl)} over ${bestStrategy.trades} tagged trades (${((bestStrategy.wins / bestStrategy.trades) * 100).toFixed(0)}% win rate${bestStrategy.avgRR != null ? `, avg ${bestStrategy.avgRR}R` : ""}). When in doubt, trade this and nothing else.`,
+    });
+  }
+
+  // Losing-streak warning — tilt guard.
+  if (agg.streaks.currentStreak <= -3) {
+    out.push({
+      tone: "critical",
+      title: `You're ${-agg.streaks.currentStreak} losses deep right now`,
+      body: `Your worst historical streak is ${agg.streaks.maxLossStreak}. This is exactly where revenge trading starts — step away, review the last ${-agg.streaks.currentStreak} trades in the journal, and come back with half size.`,
+    });
   }
 
   if (agg.expectancy != null && agg.expectancy > 0 && out.every((i) => i.tone !== "critical")) {

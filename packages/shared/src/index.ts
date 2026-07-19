@@ -219,6 +219,21 @@ export interface DurationBucketStat {
   avgRR: number | null;
 }
 
+/** One weekday×hour cell of the profit heatmap (UTC, Monday-first). */
+export interface HeatCell {
+  weekday: string; // "Mon".."Sun"
+  hour: string; // "00".."23"
+  pnl: number;
+  trades: number;
+}
+
+export interface StreakStats {
+  maxWinStreak: number;
+  maxLossStreak: number;
+  /** signed: positive = current winning streak, negative = losing streak */
+  currentStreak: number;
+}
+
 export interface Insight {
   tone: "good" | "info" | "warning" | "critical";
   title: string;
@@ -234,6 +249,8 @@ export interface AnalyticsBreakdown {
   byStrategy: StrategyStat[];
   bySetup: StrategyStat[];
   byDuration: DurationBucketStat[];
+  heatmap: HeatCell[];
+  streaks: StreakStats;
   rrHistogram: { bucket: string; count: number }[];
   avgWin: number | null;
   avgLoss: number | null; // positive magnitude

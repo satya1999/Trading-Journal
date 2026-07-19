@@ -2,7 +2,6 @@
 
 import { v } from "convex/values";
 import { action } from "./_generated/server";
-import { api } from "./_generated/api";
 import { createHash, randomBytes } from "crypto";
 
 function generateSyncToken(): { token: string; hash: string } {
@@ -19,11 +18,12 @@ export const create = action({
   handler: async (ctx, args) => {
     const { token: syncToken, hash: syncTokenHash } = generateSyncToken();
 
-    const account = await ctx.runMutation(api.accounts.insertAccount, {
+    // Cast string path as any to bypass circular TypeScript reference compilation checks
+    const account = await ctx.runMutation("accounts:insertAccount" as any, {
       token: args.token,
       label: args.label,
       syncTokenHash,
-    });
+    }) as any;
 
     return {
       account,
@@ -41,7 +41,8 @@ export const rotateToken = action({
   handler: async (ctx, args) => {
     const { token: syncToken, hash: syncTokenHash } = generateSyncToken();
 
-    await ctx.runMutation(api.accounts.updateTokenHash, {
+    // Cast string path as any to bypass circular TypeScript reference compilation checks
+    await ctx.runMutation("accounts:updateTokenHash" as any, {
       token: args.token,
       id: args.id,
       syncTokenHash,

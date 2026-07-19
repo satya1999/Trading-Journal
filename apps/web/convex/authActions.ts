@@ -2,7 +2,6 @@
 
 import { v } from "convex/values";
 import { action } from "./_generated/server";
-import { api } from "./_generated/api";
 import { pbkdf2Sync, randomBytes } from "crypto";
 
 function hashPassword(password: string): string {
@@ -28,7 +27,8 @@ export const register = action({
     const token = randomBytes(32).toString("hex");
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
 
-    return await ctx.runMutation(api.auth.registerUser, {
+    // Cast string path as any to bypass circular TypeScript reference compilation checks
+    return await ctx.runMutation("auth:registerUser" as any, {
       name: args.name,
       email: args.email,
       passwordHash,
@@ -44,7 +44,8 @@ export const login = action({
     password: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await ctx.runQuery(api.auth.getUserByEmail, { email: args.email });
+    // Cast string path as any to bypass circular TypeScript reference compilation checks
+    const user = await ctx.runQuery("auth:getUserByEmail" as any, { email: args.email }) as any;
     if (!user) {
       throw new Error("Invalid email or password");
     }
@@ -56,7 +57,8 @@ export const login = action({
     const token = randomBytes(32).toString("hex");
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
 
-    await ctx.runMutation(api.auth.createSession, {
+    // Cast string path as any to bypass circular TypeScript reference compilation checks
+    await ctx.runMutation("auth:createSession" as any, {
       userId: user._id,
       token,
       expiresAt,

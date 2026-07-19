@@ -129,9 +129,7 @@ export const remove = mutation({
     // 1. Trades
     const trades = await ctx.db
       .query("trades")
-      .index("by_account_ticket")
-      .showSystemFields(true)
-      .filter((q) => q.eq(q.field("accountId"), account._id))
+      .withIndex("by_account_ticket", (q) => q.eq("accountId", account._id))
       .collect();
     for (const t of trades) {
       // Notes
@@ -148,9 +146,7 @@ export const remove = mutation({
     // 2. Raw Deals
     const rawDeals = await ctx.db
       .query("rawDeals")
-      .index("by_account_ticket")
-      .showSystemFields(true)
-      .filter((q) => q.eq(q.field("accountId"), account._id))
+      .withIndex("by_account_ticket", (q) => q.eq("accountId", account._id))
       .collect();
     for (const r of rawDeals) {
       await ctx.db.delete(r._id);
@@ -159,9 +155,7 @@ export const remove = mutation({
     // 3. Snapshots
     const snapshots = await ctx.db
       .query("accountSnapshots")
-      .index("by_account_at")
-      .showSystemFields(true)
-      .filter((q) => q.eq(q.field("accountId"), account._id))
+      .withIndex("by_account_at", (q) => q.eq("accountId", account._id))
       .collect();
     for (const s of snapshots) {
       await ctx.db.delete(s._id);

@@ -110,7 +110,7 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
 
       <section
         aria-label="Key numbers"
-        className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4"
+        className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6"
       >
         <MiniStat
           label="Expectancy / trade"
@@ -129,6 +129,14 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
           label="Trades without SL"
           value={data.noSlPct == null ? "—" : `${fmtNum(data.noSlPct, 0)}%`}
         />
+        <MiniStat
+          label="Best win streak"
+          value={data.streaks ? `${data.streaks.maxWinStreak} wins` : "—"}
+        />
+        <MiniStat
+          label="Worst loss streak"
+          value={data.streaks ? `${data.streaks.maxLossStreak} losses` : "—"}
+        />
       </section>
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -144,6 +152,14 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
         >
           <WeekdayChart data={data} />
         </ChartCard>
+        <div className="lg:col-span-2">
+          <ChartCard
+            title="Profit heatmap"
+            subtitle="Weekday × hour (UTC) — where in the week your money moves; empty cells = no trades"
+          >
+            <HeatmapChart data={data} />
+          </ChartCard>
+        </div>
         <ChartCard
           title="Symbol performance"
           subtitle="Net P/L per market — where your edge actually is"
@@ -387,6 +403,76 @@ function RRChart({ data }: { data: AnalyticsBreakdown }) {
   );
   return (
     <EChart option={option} ariaLabel="Distribution of R multiples across closed trades" />
+  );
+}
+
+const WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function HeatmapChart({ data }: { data: AnalyticsBreakdown }) {
+  const option = useMemo<EChartsOption>(() => {
+    const cells = (data.heatmap ?? []).filter((c) => c.trades > 0);
+    const maxAbs = Math.max(1, ...cells.map((c) => Math.abs(c.pnl)));
+    const tradeCount = new Map(
+      cells.map((c) => [`${c.weekday}-${c.hour}`, c.trades]),
+    );
+    return {
+      tooltip: {
+        ...CH.tooltip,
+        formatter: (params: unknown) => {
+          const p = params as { value: [number, number, number] };
+          const [h, d, pnl] = p.value;
+          const hour = String(h).padStart(2, "0");
+          const n = tradeCount.get(`${WEEK[d]}-${hour}`) ?? 0;
+          return `<b>${WEEK[d]} ${hour}:00 UTC</b><br/>${moneyFmt(pnl)} · ${n} trade${n === 1 ? "" : "s"}`;
+        },
+      },
+      grid: { left: 8, right: 8, top: 8, bottom: 8, containLabel: true },
+      xAxis: {
+        type: "category" as const,
+        data: Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0")),
+        axisLine: { lineStyle: { color: CH.baseline } },
+        axisTick: { show: false },
+        axisLabel: { color: CH.muted, fontSize: 10, interval: 2 },
+        splitArea: { show: false },
+      },
+      yAxis: {
+        type: "category" as const,
+        data: WEEK,
+        inverse: true,
+        axisLine: { lineStyle: { color: CH.baseline } },
+        axisTick: { show: false },
+        axisLabel: { color: CH.ink2, fontSize: 11 },
+      },
+      // diverging blue↔red around a neutral dark midpoint; hidden legend —
+      // the tooltip carries exact values
+      visualMap: {
+        show: false,
+        min: -maxAbs,
+        max: maxAbs,
+        inRange: { color: [CH.neg, "#262624", CH.pos] },
+      },
+      series: [
+        {
+          type: "heatmap" as const,
+          data: cells.map((c) => [
+            Number(c.hour),
+            WEEK.indexOf(c.weekday),
+            c.pnl,
+          ]),
+          itemStyle: { borderColor: "#0d0d0d", borderWidth: 2, borderRadius: 3 },
+          emphasis: {
+            itemStyle: { borderColor: "rgba(255,255,255,0.5)", borderWidth: 1 },
+          },
+        },
+      ],
+    };
+  }, [data]);
+  return (
+    <EChart
+      option={option}
+      height={240}
+      ariaLabel="Profit heatmap by weekday and hour"
+    />
   );
 }
 
