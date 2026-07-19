@@ -1,0 +1,185 @@
+@import "tailwindcss";
+
+/* Dark-committed liquid-glass theme. Chart + data colors stay on the validated
+   reference palette (dark column); glass is chrome only — never data encoding. */
+@theme {
+  --color-plane: #0d0d0d; /* page plane */
+  --color-surface: #1a1a19; /* opaque fallback / chart surface */
+  --color-surface-2: #222220; /* raised / hover surface */
+  --color-ink: #ffffff; /* primary ink */
+  --color-ink-2: #c3c2b7; /* secondary ink */
+  --color-muted: #898781; /* axis/labels */
+  --color-grid: #2c2c2a; /* hairline gridline */
+  --color-baseline: #383835;
+  --color-accent: #3987e5; /* series slot 1 (blue, dark step) */
+  --color-accent-deep: #1c5cab;
+  --color-series-2: #008300; /* series slot 2 (green) */
+  --color-good: #0ca30c; /* delta up / success text (dark) */
+  --color-warn: #fab219; /* status warning (dark surface) */
+  --color-bad: #d03b3b; /* critical / delta down */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  background-color: var(--color-plane);
+  /* fixed gradient mesh — gives the glass something to refract */
+  background-image:
+    radial-gradient(55rem 38rem at 12% -8%, rgba(57, 135, 229, 0.16), transparent 60%),
+    radial-gradient(48rem 34rem at 105% 12%, rgba(144, 133, 233, 0.11), transparent 60%),
+    radial-gradient(42rem 30rem at 45% 115%, rgba(25, 158, 112, 0.08), transparent 60%);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+* {
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 40%, transparent);
+}
+
+/* ---- Liquid glass surfaces ---- */
+.glass {
+  background: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.02) 55%,
+    rgba(255, 255, 255, 0.04)
+  );
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 10px 30px -14px rgba(0, 0, 0, 0.65);
+}
+.glass-strong {
+  background: linear-gradient(
+    150deg,
+    rgba(34, 34, 32, 0.82),
+    rgba(20, 20, 19, 0.72)
+  );
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 24px 60px -20px rgba(0, 0, 0, 0.8);
+}
+.glass-hover {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.glass-hover:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 14px 36px -14px rgba(0, 0, 0, 0.7);
+  transform: translateY(-1px);
+}
+
+/* Accessible, consistent focus */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Slim dark scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-baseline) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-baseline);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Motion */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slide-in-right {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-good) 45%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+.anim-fade-up {
+  animation: fade-up 0.25s ease-out both;
+}
+.anim-slide-in {
+  animation: slide-in-right 0.22s ease-out both;
+}
+.skeleton {
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.04) 40%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 10px;
+}
+.dot-online {
+  animation: pulse-dot 2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up,
+  .anim-slide-in,
+  .skeleton,
+  .dot-online {
+    animation: none;
+  }
+}
+/* Respect reduced-transparency: fall back to opaque surfaces */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-strong {
+    background: var(--color-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

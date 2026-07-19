@@ -1,0 +1,18 @@
+{
+  "name": "trademind",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.10.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "db:up": "node tools/dev-db/index.mjs",
+    "db:migrate": "pnpm --filter @trademind/api db:migrate",
+    "db:studio": "pnpm --filter @trademind/api db:studio",
+    "simulate": "node tools/ea-simulator/index.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  }
+}

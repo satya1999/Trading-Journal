@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Better Auth core tables (shape required by better-auth's prisma adapter)
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  plan          String   @default("free")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions        Session[]
+  accounts        Account[]
+  tradingAccounts TradingAccount[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Trading domain
+// ---------------------------------------------------------------------------
+
+model TradingAccount {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label            String
+  broker           String?
+  server           String?
+  accountNumber    BigInt?
+  currency         String    @default("USD")
+  leverage         Int?
+  balance          Float     @default(0)
+  equity           Float     @default(0)
+  margin           Float     @default(0)
+  freeMargin       Float     @default(0)
+  utcOffsetMinutes Int       @default(0)
+  syncTokenHash    String    @unique
+  lastHeartbeatAt  DateTime?
+  lastDealTicket   BigInt    @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  trades    Trade[]
+  rawDeals  RawDeal[]
+  snapshots AccountSnapshot[]
+}
+
+// One trade = one MT5 position (aggregated from its deals via POSITION_IDENTIFIER)
+model Trade {
+  id          String    @id @default(cuid())
+  accountId   String
+  account     TradingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ticket      BigInt // MT5 position id
+  symbol      String
+  direction   String // buy | sell
+  state       String    @default("open") // open | closed
+  volume      Float
+  entryPrice  Float
+  exitPrice   Float?
+  sl          Float?
+  tp          Float?
+  openTime    DateTime // UTC
+  closeTime   DateTime?
+  commission  Float     @default(0)
+  swap        Float     @default(0)
+  profit      Float     @default(0)
+  netProfit   Float     @default(0)
+  pips        Float?
+  rr          Float?
+  durationSec Int?
+  digits      Int       @default(5)
+  point       Float     @default(0.00001)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  note     TradeNote?
+  analysis AiAnalysis?
+
+  @@unique([accountId, ticket])
+  @@index([accountId, state])
+  @@index([accountId, closeTime])
+  @@index([accountId, symbol])
+}
+
+// Raw MT5 deal fills, kept verbatim so trades can always be recomputed
+// (partial closes, late-arriving fills, metric formula changes).
+model RawDeal {
+  id         String   @id @default(cuid())
+  accountId  String
+  account    TradingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ticket     BigInt // deal ticket
+  positionId BigInt
+  time       DateTime // UTC
+  payload    Json // DealPayload from @trademind/shared
+
+  @@unique([accountId, ticket])
+  @@index([accountId, positionId])
+}
+
+model TradeNote {
+  id        String   @id @default(cuid())
+  tradeId   String   @unique
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  note      String?
+  strategy  String?
+  setup     String?
+  tags      String[] @default([])
+  updatedAt DateTime @updatedAt
+}
+
+model AccountSnapshot {
+  id         String   @id @default(cuid())
+  accountId  String
+  account    TradingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  balance    Float
+  equity     Float
+  margin     Float    @default(0)
+  freeMargin Float    @default(0)
+  at         DateTime @default(now())
+
+  @@index([accountId, at])
+}
+
+// Milestone 2: per-trade AI scoring (Anthropic Claude). Schema reserved now.
+model AiAnalysis {
+  id              String   @id @default(cuid())
+  tradeId         String   @unique
+  trade           Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  tradeScore      Int?
+  executionScore  Int?
+  riskScore       Int?
+  psychologyScore Int?
+  summary         String?
+  createdAt       DateTime @default(now())
+}
