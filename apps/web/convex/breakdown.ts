@@ -8,7 +8,7 @@ import {
   SessionStat,
   StrategyStat,
   DurationBucketStat,
-} from "../../../packages/shared/src/index";
+} from "@trademind/shared";
 
 export interface ClosedTradeRow {
   symbol: string;

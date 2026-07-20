@@ -1,4 +1,4 @@
-import { DealPayload, OpenPositionPayload } from "../../packages/shared/src/index";
+import { DealPayload, OpenPositionPayload } from "@trademind/shared";
 
 export interface AggregatedTrade {
   ticket: number;

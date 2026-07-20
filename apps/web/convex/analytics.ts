@@ -19,7 +19,7 @@ async function getAccountIds(ctx: any, user: any, accountId?: string): Promise<a
     .query("tradingAccounts")
     .withIndex("by_userId", (q: any) => q.eq("userId", user._id))
     .collect();
-  return accounts.map((a) => a._id);
+  return accounts.map((a: any) => a._id);
 }
 
 // Summary statistics
@@ -38,7 +38,7 @@ export const summary = query({
     let balance = 0;
     let equity = 0;
     for (const id of ids) {
-      const account = await ctx.db.get(id);
+      const account = (await ctx.db.get(id)) as { balance: number; equity: number } | null;
       if (account) {
         balance += account.balance;
         equity += account.equity;
@@ -112,7 +112,7 @@ export const equityCurve = query({
     // Total current balance
     let currentBalance = 0;
     for (const id of ids) {
-      const account = await ctx.db.get(id);
+      const account = (await ctx.db.get(id)) as { balance: number } | null;
       if (account) currentBalance += account.balance;
     }
 
