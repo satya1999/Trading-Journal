@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -39,7 +39,7 @@ export default function TradesPage() {
     <div className="mx-auto max-w-6xl">
       <h1 className="text-2xl font-semibold">Trade journal</h1>
       <p className="mt-0.5 mb-5 text-sm text-ink-2">
-        Every synced trade — click a row to review and annotate it.
+        Every synced trade â€” click a row to review and annotate it.
       </p>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -59,7 +59,7 @@ export default function TradesPage() {
           ))}
         </Select>
         <Input
-          placeholder="Filter symbol… (e.g. XAUUSD)"
+          placeholder="Filter symbolâ€¦ (e.g. XAUUSD)"
           value={symbol}
           onChange={(e) => {
             setSymbol(e.target.value.trim());
@@ -139,7 +139,7 @@ export default function TradesPage() {
                   </td>
                   <td className="px-2 py-2.5">{t.volume}</td>
                   <td className="px-2 py-2.5">{t.entryPrice}</td>
-                  <td className="px-2 py-2.5">{t.exitPrice ?? "—"}</td>
+                  <td className="px-2 py-2.5">{t.exitPrice ?? "â€”"}</td>
                   <td className="px-2 py-2.5 text-right">{fmtNum(t.pips, 1)}</td>
                   <td className="px-2 py-2.5 text-right">{fmtNum(t.rr)}</td>
                   <td
@@ -211,6 +211,11 @@ function TradeDrawer({
   trade: TradeDto;
   onClose: () => void;
 }) {
+  const [note, setNote] = useState(trade.note?.note ?? "");
+  const [strategy, setStrategy] = useState(trade.note?.strategy ?? "");
+  const [setup, setSetup] = useState(trade.note?.setup ?? "");
+  const [tags, setTags] = useState(trade.note?.tags.join(", ") ?? "");
+
   const saveNote = useMutation(api.trades.upsertNote);
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -272,9 +277,9 @@ function TradeDrawer({
         <div className="mb-6 rounded-xl border bg-black/25 px-4 py-2">
           <Row label="Volume" value={`${trade.volume} lots`} />
           <Row label="Entry" value={trade.entryPrice} />
-          <Row label="Exit" value={trade.exitPrice ?? "—"} />
-          <Row label="Stop loss" value={trade.sl ?? "—"} />
-          <Row label="Take profit" value={trade.tp ?? "—"} />
+          <Row label="Exit" value={trade.exitPrice ?? "â€”"} />
+          <Row label="Stop loss" value={trade.sl ?? "â€”"} />
+          <Row label="Take profit" value={trade.tp ?? "â€”"} />
           <Row label="Pips" value={fmtNum(trade.pips, 1)} />
           <Row label="R multiple" value={fmtNum(trade.rr)} />
           <Row label="Commission" value={fmtSigned(trade.commission)} />
@@ -284,7 +289,7 @@ function TradeDrawer({
           <Row
             label="Closed"
             value={
-              trade.closeTime ? new Date(trade.closeTime).toLocaleString() : "—"
+              trade.closeTime ? new Date(trade.closeTime).toLocaleString() : "â€”"
             }
           />
         </div>
@@ -330,10 +335,10 @@ function TradeDrawer({
           />
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={busy}>
-              {busy ? "Saving…" : "Save journal"}
+              {busy ? "Savingâ€¦" : "Save journal"}
             </Button>
             {success && !busy && (
-              <span className="text-sm text-good">Saved ✓</span>
+              <span className="text-sm text-good">Saved âœ“</span>
             )}
           </div>
         </form>
@@ -341,105 +346,4 @@ function TradeDrawer({
     </div>
   );
 
-  return (
-    <div
-      className="fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-[2px]"
-      onClick={onClose}
-    >
-      <aside
-        className="glass-strong anim-slide-in h-full w-full max-w-md overflow-y-auto border-l p-6"
-        onClick={(e) => e.stopPropagation()}
-        aria-label={`Trade ${trade.symbol} #${trade.ticket}`}
-      >
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">{trade.symbol}</h2>
-              <DirectionBadge direction={trade.direction} />
-              {trade.state === "open" && <Badge tone="accent">open</Badge>}
-            </div>
-            <p className="mt-0.5 text-xs text-muted">Ticket #{trade.ticket}</p>
-          </div>
-          <p
-            className={clsx(
-              "text-2xl font-semibold tabular-nums",
-              trade.netProfit > 0 && "text-good",
-              trade.netProfit < 0 && "text-bad",
-            )}
-          >
-            {fmtSigned(trade.netProfit)}
-          </p>
-        </div>
-
-        <div className="mb-6 rounded-xl border bg-black/25 px-4 py-2">
-          <Row label="Volume" value={`${trade.volume} lots`} />
-          <Row label="Entry" value={trade.entryPrice} />
-          <Row label="Exit" value={trade.exitPrice ?? "—"} />
-          <Row label="Stop loss" value={trade.sl ?? "—"} />
-          <Row label="Take profit" value={trade.tp ?? "—"} />
-          <Row label="Pips" value={fmtNum(trade.pips, 1)} />
-          <Row label="R multiple" value={fmtNum(trade.rr)} />
-          <Row label="Commission" value={fmtSigned(trade.commission)} />
-          <Row label="Swap" value={fmtSigned(trade.swap)} />
-          <Row label="Duration" value={fmtDuration(trade.durationSec)} />
-          <Row label="Opened" value={new Date(trade.openTime).toLocaleString()} />
-          <Row
-            label="Closed"
-            value={
-              trade.closeTime ? new Date(trade.closeTime).toLocaleString() : "—"
-            }
-          />
-        </div>
-
-        <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink-2">
-          <NotebookPen className="size-4" aria-hidden /> Journal
-        </h3>
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate();
-          }}
-        >
-          <Input
-            placeholder="Strategy (e.g. London breakout)"
-            value={strategy}
-            onChange={(e) => setStrategy(e.target.value)}
-          />
-          <Input
-            placeholder="Setup (e.g. OB retest + FVG)"
-            value={setup}
-            onChange={(e) => setSetup(e.target.value)}
-          />
-          <div className="relative">
-            <Tag
-              className="absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted"
-              aria-hidden
-            />
-            <Input
-              placeholder="Tags, comma separated"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          <textarea
-            placeholder="What happened? What did you feel? What would you repeat or avoid?"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={5}
-            className="w-full rounded-lg border bg-white/5 px-3 py-2 text-sm text-ink backdrop-blur-sm transition-colors placeholder:text-muted hover:border-baseline focus:border-accent focus:outline-none"
-          />
-          <div className="flex items-center gap-3">
-            <Button type="submit" disabled={save.isPending}>
-              {save.isPending ? "Saving…" : "Save journal"}
-            </Button>
-            {save.isSuccess && !save.isPending && (
-              <span className="text-sm text-good">Saved ✓</span>
-            )}
-          </div>
-        </form>
-      </aside>
-    </div>
-  );
 }

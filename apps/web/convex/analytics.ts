@@ -8,7 +8,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 // Helper to gather account IDs
 async function getAccountIds(ctx: any, user: any, accountId?: string): Promise<any[]> {
   if (accountId) {
-    const account = await ctx.db.get(accountId as any);
+    const account = (await ctx.db.get(accountId as any)) as any;
     if (!account || account.userId !== user._id) {
       throw new Error("Trading account not found");
     }

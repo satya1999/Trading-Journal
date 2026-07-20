@@ -56,7 +56,7 @@ export const list = query({
     // Gather valid account IDs for the user
     let accountIds: string[] = [];
     if (args.accountId) {
-      const account = await ctx.db.get(args.accountId as any);
+      const account = (await ctx.db.get(args.accountId as any)) as any;
       if (!account || account.userId !== user._id) {
         throw new Error("Account not found");
       }

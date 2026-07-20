@@ -1,8 +1,7 @@
 "use client";
 
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useEffect, useState } from "react";
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL ?? "https://careful-duck-681.convex.cloud";
 export const convex = new ConvexReactClient(CONVEX_URL);
@@ -15,29 +14,11 @@ export interface SessionUser {
 }
 
 export function useSession() {
-  const [data, setData] = useState<{ user: SessionUser } | null>(null);
-  const [isPending, setIsPending] = useState(true);
-
-  useEffect(() => {
-    const token = localStorage.getItem("tm_session_token");
-    if (!token) {
-      setIsPending(false);
-      return;
-    }
-
-    // Reactively watch user session profile
-    const unsubscribe = convex.onQuery(api.auth.me, { token }, (user) => {
-      if (user) {
-        setData({ user });
-      } else {
-        localStorage.removeItem("tm_session_token");
-        setData(null);
-      }
-      setIsPending(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
+  const user = useQuery(api.auth.me, token ? { token } : "skip") as SessionUser | null | undefined;
+  
+  const isPending = user === undefined && !!token;
+  const data = user ? { user } : null;
 
   return { data, isPending };
 }
