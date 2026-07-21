@@ -14,6 +14,7 @@ import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as authActions from "../authActions.js";
 import type * as breakdown from "../breakdown.js";
+import type * as chat from "../chat.js";
 import type * as crypto from "../crypto.js";
 import type * as http from "../http.js";
 import type * as metrics from "../metrics.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authActions: typeof authActions;
   breakdown: typeof breakdown;
+  chat: typeof chat;
   crypto: typeof crypto;
   http: typeof http;
   metrics: typeof metrics;

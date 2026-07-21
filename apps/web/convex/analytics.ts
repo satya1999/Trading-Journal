@@ -201,6 +201,9 @@ export const breakdown = query({
           durationSec: t.durationSec ?? null,
           strategy: note ? (note.strategy ?? null) : null,
           setup: note ? (note.setup ?? null) : null,
+          commission: t.commission ?? 0,
+          swap: t.swap ?? 0,
+          volume: t.volume,
         };
       })
     );

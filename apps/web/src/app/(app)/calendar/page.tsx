@@ -17,8 +17,8 @@ import { useAccounts, useCalendar, useTrades } from "@/lib/queries";
 // P/L polarity uses the validated diverging pair (blue = profit, red = loss,
 // neutral surface at zero) — every cell also carries the number, so color
 // never works alone.
-const POS = "#3987e5";
-const NEG = "#e66767";
+const POS = "#00e676"; // Neon green
+const NEG = "#991b1b"; // Deep red
 
 function monthStr(d: Date) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -35,6 +35,8 @@ export default function CalendarPage() {
 
   const month = monthStr(cursor);
   const { data: days, isLoading } = useCalendar(month, accountId || undefined);
+  const activeAccount = accounts?.find((a) => a.id === accountId);
+  const currency = activeAccount?.currency ?? "USD";
   const byDate = new Map((days ?? []).map((d) => [d.date, d]));
   const maxAbs = Math.max(1, ...(days ?? []).map((d) => Math.abs(d.pnl)));
 
@@ -111,7 +113,7 @@ export default function CalendarPage() {
                       totalPnl < 0 && "text-bad",
                     )}
                   >
-                    {fmtSigned(totalPnl)}
+                    {fmtSigned(totalPnl, currency)}
                   </span>
                   <span className="text-muted">
                     {" "}
@@ -159,6 +161,7 @@ export default function CalendarPage() {
                     date={date}
                     day={byDate.get(date)}
                     maxAbs={maxAbs}
+                    currency={currency}
                     selected={selectedDay === date}
                     onClick={() =>
                       setSelectedDay(selectedDay === date ? null : date)
@@ -182,12 +185,14 @@ function DayCell({
   date,
   day,
   maxAbs,
+  currency,
   selected,
   onClick,
 }: {
   date: string;
   day?: CalendarDay;
   maxAbs: number;
+  currency: string;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -214,11 +219,10 @@ function DayCell({
       <span className="text-xs text-ink-2">{Number(date.slice(8))}</span>
       {day && (
         <>
-          <span className="mt-auto text-sm font-semibold tabular-nums">
-            {day.pnl > 0 ? "+" : ""}
-            {day.pnl.toFixed(0)}
+          <span className="mt-auto text-[10px] font-semibold tabular-nums leading-none">
+            {fmtSigned(day.pnl, currency)}
           </span>
-          <span className="text-[10px] text-ink-2">
+          <span className="mt-0.5 text-[9px] leading-none text-ink-2">
             {day.trades} trade{day.trades === 1 ? "" : "s"}
           </span>
         </>
@@ -228,6 +232,7 @@ function DayCell({
 }
 
 function DayTrades({ date, accountId }: { date: string; accountId?: string }) {
+  const { data: accounts } = useAccounts();
   const from = `${date}T00:00:00.000Z`;
   const to = `${date}T23:59:59.999Z`;
   const { data, isLoading } = useTrades({
@@ -239,6 +244,10 @@ function DayTrades({ date, accountId }: { date: string; accountId?: string }) {
   const items = (data?.items ?? []).filter(
     (t) => t.closeTime && t.closeTime >= from && t.closeTime <= to,
   );
+
+  const getTradeCurrency = (tradeAccountId: string) => {
+    return accounts?.find((a) => a.id === tradeAccountId)?.currency ?? "USD";
+  };
 
   return (
     <Card className="anim-fade-up mt-4 p-0">
@@ -274,7 +283,7 @@ function DayTrades({ date, accountId }: { date: string; accountId?: string }) {
                     t.netProfit < 0 && "text-bad",
                   )}
                 >
-                  {fmtSigned(t.netProfit)}
+                  {fmtSigned(t.netProfit, getTradeCurrency(t.accountId))}
                 </td>
                 <td className="px-5 py-2.5 text-right text-muted">
                   {fmtDuration(t.durationSec)}

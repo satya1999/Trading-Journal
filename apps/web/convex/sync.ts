@@ -111,6 +111,10 @@ export const deals = mutation({
         time: v.number(), // unix seconds
         digits: v.number(),
         point: v.number(),
+        // Optional metadata the EA includes; Convex validators reject unknown
+        // keys, so every field the EA can send must be declared here.
+        magic: v.optional(v.number()),
+        comment: v.optional(v.string()),
       })
     ),
     openPositions: v.array(

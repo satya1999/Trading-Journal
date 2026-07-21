@@ -6,8 +6,8 @@ import { useEffect, useRef } from "react";
 // Shared chart chrome (validated dark palette). Data colors are passed per
 // chart: blue/red diverging for P/L polarity, single blue for frequency.
 export const CH = {
-  pos: "#3987e5",
-  neg: "#e66767",
+  pos: "#00e676", // Neon green
+  neg: "#991b1b", // Deep red
   blue: "#3987e5",
   ink: "#ffffff",
   ink2: "#c3c2b7",
@@ -21,14 +21,20 @@ export const CH = {
   },
 } as const;
 
-export const moneyFmt = (v: unknown) =>
-  typeof v === "number"
-    ? new Intl.NumberFormat("en-US", {
+export const moneyFmt = (v: unknown, currency = "USD") => {
+  if (typeof v !== "number") return "—";
+  try {
+    const isIso = /^[A-Z]{3}$/i.test(currency);
+    if (isIso) {
+      return new Intl.NumberFormat("en-US", {
         style: "currency",
-        currency: "USD",
+        currency: currency.toUpperCase(),
         maximumFractionDigits: 0,
-      }).format(v)
-    : "—";
+      }).format(v);
+    }
+  } catch (e) {}
+  return `${v.toFixed(0)} ${currency}`;
+};
 
 export function EChart({
   option,

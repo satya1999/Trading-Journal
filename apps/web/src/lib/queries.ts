@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery as useConvexQuery } from "convex/react";
+import { useAction, useQuery as useConvexQuery } from "convex/react";
+import { useCallback } from "react";
 import { api } from "../../convex/_generated/api";
 import { TradingAccountDto, TradeDto, AnalyticsSummary, EquityPoint, AnalyticsBreakdown, CalendarDay } from "@trademind/shared";
 
@@ -54,4 +55,39 @@ export function useCalendar(month: string, accountId?: string) {
   const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
   const data = useConvexQuery(api.analytics.calendar, { token, month, accountId }) as CalendarDay[] | undefined;
   return { data, isLoading: data === undefined };
+}
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  at: number;
+}
+
+export function useChatHistory(accountId?: string) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("tm_session_token") ?? "" : "";
+  const data = useConvexQuery(
+    api.chat.history,
+    token ? { token, accountId } : "skip",
+  ) as ChatMessage[] | undefined;
+  return { data, isLoading: data === undefined };
+}
+
+export function useChatSend() {
+  const sendAction = useAction(api.chat.send);
+  return useCallback(
+    async (message: string, accountId?: string) => {
+      const token = localStorage.getItem("tm_session_token") || "";
+      return sendAction({ token, message, accountId });
+    },
+    [sendAction],
+  );
+}
+
+export function useChatClear() {
+  const clearAction = useAction(api.chat.clearChat);
+  return useCallback(async () => {
+    const token = localStorage.getItem("tm_session_token") || "";
+    return clearAction({ token });
+  }, [clearAction]);
 }

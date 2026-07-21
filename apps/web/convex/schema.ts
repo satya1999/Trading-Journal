@@ -96,4 +96,13 @@ export default defineSchema({
     setup: v.optional(v.string()),
     tags: v.array(v.string()),
   }).index("by_tradeId", ["tradeId"]),
+
+  // AI coach chat history (per user, optionally scoped to one account)
+  chatMessages: defineTable({
+    userId: v.id("users"),
+    accountId: v.optional(v.id("tradingAccounts")),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    at: v.number(),
+  }).index("by_user_at", ["userId", "at"]),
 });

@@ -20,6 +20,9 @@ export interface ClosedTradeRow {
   durationSec: number | null;
   strategy: string | null;
   setup: string | null;
+  commission?: number;
+  swap?: number;
+  volume?: number;
 }
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -467,6 +470,50 @@ function buildInsights(
     });
   }
 
+  // Cost drag: commission + swap as a share of gross P/L swing.
+  const totalCosts = round2(
+    trades.reduce((s, t) => s + Math.abs(t.commission ?? 0) + Math.abs(t.swap ?? 0), 0),
+  );
+  const grossAbs = round2(trades.reduce((s, t) => s + Math.abs(t.netProfit), 0));
+  if (totalCosts > 0 && grossAbs > 0) {
+    const costPct = (totalCosts / grossAbs) * 100;
+    if (costPct >= 15) {
+      out.push({
+        tone: "warning",
+        title: `Costs ate ${money(totalCosts)} of your P/L swing`,
+        body: `Commission + swap total ${money(totalCosts)} — about ${costPct.toFixed(0)}% of your gross trade movement. High-frequency scalping on a wide-spread symbol is the usual cause; check your broker's cost per lot on your most-traded symbol.`,
+      });
+    }
+  }
+
+  // Position-size consistency: wildly varying lot sizes usually mean sizing
+  // by feel rather than a fixed risk %, which makes the R-multiple stats above
+  // less trustworthy.
+  const volumes = trades.map((t) => t.volume).filter((v): v is number => v != null && v > 0);
+  if (volumes.length >= MIN_SAMPLE) {
+    const avgVol = volumes.reduce((s, v) => s + v, 0) / volumes.length;
+    const maxVol = Math.max(...volumes);
+    if (avgVol > 0 && maxVol / avgVol >= 4) {
+      out.push({
+        tone: "info",
+        title: "Your position sizes swing wildly",
+        body: `Largest trade was ${(maxVol / avgVol).toFixed(1)}× your average lot size (${maxVol} vs avg ${avgVol.toFixed(2)}). If size isn't tied to a fixed risk %, one oversized trade can undo many disciplined ones — and it skews your win-rate stats toward whichever trades happened to be biggest.`,
+      });
+    }
+  }
+
+  // Single-trade tail risk: one loss dominating the entire drawdown.
+  if (agg.avgLoss != null && agg.avgLoss > 0) {
+    const worstLoss = Math.min(0, ...trades.map((t) => t.netProfit));
+    if (worstLoss < 0 && Math.abs(worstLoss) >= agg.avgLoss * 4) {
+      out.push({
+        tone: "critical",
+        title: `One trade lost ${(Math.abs(worstLoss) / agg.avgLoss).toFixed(1)}× your typical loss`,
+        body: `Your worst single trade was ${money(worstLoss)}, versus a typical loss of ${money(agg.avgLoss)}. A hard max-loss-per-trade rule (or a stop that's never moved further away) would have capped this at a fraction of the damage.`,
+      });
+    }
+  }
+
   if (agg.expectancy != null && agg.expectancy > 0 && out.every((i) => i.tone !== "critical")) {
     out.push({
       tone: "good",
@@ -476,5 +523,5 @@ function buildInsights(
   }
 
   const order = { critical: 0, warning: 1, info: 2, good: 3 };
-  return out.sort((a, b) => order[a.tone] - order[b.tone]).slice(0, 6);
+  return out.sort((a, b) => order[a.tone] - order[b.tone]).slice(0, 9);
 }

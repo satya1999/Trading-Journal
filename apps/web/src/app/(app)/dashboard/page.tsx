@@ -26,6 +26,8 @@ export default function DashboardPage() {
     pageSize: 8,
   });
 
+  const activeAccount = accounts?.find((a) => a.id === accountId);
+  const currency = activeAccount?.currency ?? "USD";
   const noAccounts = !accountsLoading && !accounts?.length;
 
   return (
@@ -84,7 +86,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile
               label="Today's P/L"
-              value={fmtSigned(s.todayPnl)}
+              value={fmtSigned(s.todayPnl, currency)}
               delta={s.todayPnl}
             />
             <StatTile
@@ -102,20 +104,20 @@ export default function DashboardPage() {
               value={fmtNum(s.avgRR)}
               hint="risk-adjusted result"
             />
-            <StatTile label="Balance" value={fmtMoney(s.balance)} />
+            <StatTile label="Balance" value={fmtMoney(s.balance, currency)} />
             <StatTile
               label="Equity"
-              value={fmtMoney(s.equity)}
+              value={fmtMoney(s.equity, currency)}
               hint={`${s.openTrades} open trade${s.openTrades === 1 ? "" : "s"}`}
             />
             <StatTile
               label="Net P/L"
-              value={fmtSigned(s.netProfit)}
+              value={fmtSigned(s.netProfit, currency)}
               delta={s.netProfit}
             />
             <StatTile
               label="Max drawdown"
-              value={s.maxDrawdown == null ? "—" : fmtMoney(-s.maxDrawdown)}
+              value={s.maxDrawdown == null ? "—" : fmtMoney(-s.maxDrawdown, currency)}
               hint="peak to trough"
             />
           </div>
@@ -125,7 +127,7 @@ export default function DashboardPage() {
               Equity curve
             </h2>
             {curve && curve.trades.length > 0 ? (
-              <EquityChart trades={curve.trades} snapshots={curve.snapshots} />
+              <EquityChart trades={curve.trades} snapshots={curve.snapshots} currency={currency} />
             ) : (
               <p className="py-16 text-center text-sm text-muted">
                 The curve appears after your first closed trades sync.
@@ -152,38 +154,43 @@ export default function DashboardPage() {
             ) : (
               <table className="mt-2 w-full text-sm tabular-nums">
                 <tbody>
-                  {recent.items.map((t) => (
-                    <tr
-                      key={t.id}
-                      className="border-t border-grid transition-colors hover:bg-surface-2/60"
-                    >
-                      <td className="px-5 py-2.5 font-medium">{t.symbol}</td>
-                      <td className="px-2 py-2.5">
-                        <DirectionBadge direction={t.direction} />
-                      </td>
-                      <td className="px-2 py-2.5 text-ink-2">{t.volume} lots</td>
-                      <td className="px-2 py-2.5 text-right text-ink-2">
-                        {fmtNum(t.pips, 1)} pips
-                      </td>
-                      <td
-                        className={clsx(
-                          "px-2 py-2.5 text-right font-semibold",
-                          t.netProfit > 0 && "text-good",
-                          t.netProfit < 0 && "text-bad",
-                        )}
+                  {(() => {
+                    const getTradeCurrency = (tradeAccountId: string) => {
+                      return accounts?.find((a) => a.id === tradeAccountId)?.currency ?? "USD";
+                    };
+                    return recent.items.map((t) => (
+                      <tr
+                        key={t.id}
+                        className="border-t border-grid transition-colors hover:bg-surface-2/60"
                       >
-                        {fmtSigned(t.netProfit)}
-                      </td>
-                      <td className="px-2 py-2.5 text-ink-2">
-                        {fmtDuration(t.durationSec)}
-                      </td>
-                      <td className="px-5 py-2.5 text-right text-muted">
-                        {t.closeTime
-                          ? new Date(t.closeTime).toLocaleDateString()
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="px-5 py-2.5 font-medium">{t.symbol}</td>
+                        <td className="px-2 py-2.5">
+                          <DirectionBadge direction={t.direction} />
+                        </td>
+                        <td className="px-2 py-2.5 text-ink-2">{t.volume} lots</td>
+                        <td className="px-2 py-2.5 text-right text-ink-2">
+                          {fmtNum(t.pips, 1)} pips
+                        </td>
+                        <td
+                          className={clsx(
+                            "px-2 py-2.5 text-right font-semibold",
+                            t.netProfit > 0 && "text-good",
+                            t.netProfit < 0 && "text-bad",
+                          )}
+                        >
+                          {fmtSigned(t.netProfit, getTradeCurrency(t.accountId))}
+                        </td>
+                        <td className="px-2 py-2.5 text-ink-2">
+                          {fmtDuration(t.durationSec)}
+                        </td>
+                        <td className="px-5 py-2.5 text-right text-muted">
+                          {t.closeTime
+                            ? new Date(t.closeTime).toLocaleDateString()
+                            : "—"}
+                        </td>
+                      </tr>
+                    ));
+                  })()}
                 </tbody>
               </table>
             )}

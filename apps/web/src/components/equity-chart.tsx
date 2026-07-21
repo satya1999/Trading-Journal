@@ -16,9 +16,11 @@ const SERIES_2 = "#008300";
 export function EquityChart({
   trades,
   snapshots,
+  currency = "USD",
 }: {
   trades: EquityPoint[];
   snapshots: EquityPoint[];
+  currency?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -44,13 +46,19 @@ export function EquityChart({
         backgroundColor: "#1a1a19",
         borderColor: "rgba(255,255,255,0.1)",
         textStyle: { color: "#ffffff", fontSize: 12 },
-        valueFormatter: (v: number) =>
-          v == null
-            ? "—"
-            : new Intl.NumberFormat("en-US", {
+        valueFormatter: (v: number) => {
+          if (v == null) return "—";
+          try {
+            const isIso = /^[A-Z]{3}$/i.test(currency);
+            if (isIso) {
+              return new Intl.NumberFormat("en-US", {
                 style: "currency",
-                currency: "USD",
-              }).format(v),
+                currency: currency.toUpperCase(),
+              }).format(v);
+            }
+          } catch (e) {}
+          return `${v.toFixed(2)} ${currency}`;
+        },
       },
       xAxis: {
         type: "time",

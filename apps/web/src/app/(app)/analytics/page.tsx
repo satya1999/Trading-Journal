@@ -8,8 +8,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Lightbulb,
+  MessageCircleQuestion,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { CoachChat } from "@/components/coach-chat";
 import { CH, EChart, moneyFmt } from "@/components/echart";
 import { Card, Select, Skeleton } from "@/components/ui";
 import { fmtMoney, fmtNum, fmtSigned } from "@/lib/api";
@@ -19,6 +21,16 @@ export default function AnalyticsPage() {
   const { data: accounts } = useAccounts();
   const [accountId, setAccountId] = useState("");
   const { data, isLoading } = useBreakdown(accountId || undefined);
+  const [draft, setDraft] = useState("");
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  const activeAccount = accounts?.find((a) => a.id === accountId);
+  const currency = activeAccount?.currency ?? "USD";
+
+  function askCoach(question: string) {
+    setDraft(question);
+    chatRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -53,11 +65,30 @@ export default function AnalyticsPage() {
           </div>
         </div>
       ) : data.closedTrades === 0 ? (
-        <Card className="py-14 text-center text-ink-2">
-          Analytics unlock after your first closed trades sync.
-        </Card>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="py-14 text-center text-ink-2 lg:col-span-2">
+            Charts and suggestions unlock after your first closed trades sync.
+          </Card>
+          <CoachChat
+            accountId={accountId || undefined}
+            draft={draft}
+            onDraftChange={setDraft}
+          />
+        </div>
       ) : (
-        <BreakdownView data={data} />
+        <div className="grid items-start gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <BreakdownView data={data} currency={currency} onAskCoach={askCoach} />
+          </div>
+          <div className="lg:sticky lg:top-4">
+            <CoachChat
+              accountId={accountId || undefined}
+              draft={draft}
+              onDraftChange={setDraft}
+              panelRef={chatRef}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
@@ -75,12 +106,20 @@ const TONE: Record<
   good: { icon: CheckCircle2, color: "#0ca30c", label: "Working" },
 };
 
-function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
+function BreakdownView({
+  data,
+  currency,
+  onAskCoach,
+}: {
+  data: AnalyticsBreakdown;
+  currency: string;
+  onAskCoach: (question: string) => void;
+}) {
   return (
     <>
       <section aria-label="How to improve">
         <h2 className="mb-2 text-sm font-semibold text-ink-2">
-          How to improve — from your last {data.closedTrades} closed trades
+          Suggestions — from your last {data.closedTrades} closed trades
         </h2>
         <div className="grid gap-3 md:grid-cols-2">
           {data.insights.map((ins) => {
@@ -88,7 +127,7 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
             return (
               <Card
                 key={ins.title}
-                className="anim-fade-up border-l-2 pl-4"
+                className="anim-fade-up flex flex-col border-l-2 pl-4"
                 interactive
               >
                 <div
@@ -102,6 +141,16 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
                 <p className="mt-1 text-sm leading-relaxed text-ink-2">
                   {ins.body}
                 </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAskCoach(`Tell me more about this: "${ins.title}" — ${ins.body}`)
+                  }
+                  className="mt-2.5 flex items-center gap-1.5 self-start text-xs font-medium text-accent transition-colors hover:text-accent-deep"
+                >
+                  <MessageCircleQuestion className="size-3.5" aria-hidden />
+                  Ask the coach about this
+                </button>
               </Card>
             );
           })}
@@ -114,16 +163,16 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
       >
         <MiniStat
           label="Expectancy / trade"
-          value={data.expectancy == null ? "—" : fmtSigned(data.expectancy)}
+          value={data.expectancy == null ? "—" : fmtSigned(data.expectancy, currency)}
           signed={data.expectancy}
         />
         <MiniStat
           label="Average win"
-          value={data.avgWin == null ? "—" : fmtMoney(data.avgWin)}
+          value={data.avgWin == null ? "—" : fmtMoney(data.avgWin, currency)}
         />
         <MiniStat
           label="Average loss"
-          value={data.avgLoss == null ? "—" : fmtMoney(-data.avgLoss)}
+          value={data.avgLoss == null ? "—" : fmtMoney(-data.avgLoss, currency)}
         />
         <MiniStat
           label="Trades without SL"
@@ -142,41 +191,41 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="P/L by hour of day"
-          subtitle="When you open trades (UTC) — blue profits, red losses"
+          subtitle="When you open trades (UTC) — green profits, red losses"
         >
-          <HourChart data={data} />
+          <HourChart data={data} currency={currency} />
         </ChartCard>
         <ChartCard
           title="P/L by weekday"
           subtitle="Net result of trades opened on each day"
         >
-          <WeekdayChart data={data} />
+          <WeekdayChart data={data} currency={currency} />
         </ChartCard>
         <div className="lg:col-span-2">
           <ChartCard
             title="Profit heatmap"
             subtitle="Weekday × hour (UTC) — where in the week your money moves; empty cells = no trades"
           >
-            <HeatmapChart data={data} />
+            <HeatmapChart data={data} currency={currency} />
           </ChartCard>
         </div>
         <ChartCard
           title="Symbol performance"
           subtitle="Net P/L per market — where your edge actually is"
         >
-          <SymbolChart data={data} />
+          <SymbolChart data={data} currency={currency} />
         </ChartCard>
         <ChartCard
           title="Session performance"
           subtitle="Net P/L by market session (UTC)"
         >
-          <SessionChart data={data} />
+          <SessionChart data={data} currency={currency} />
         </ChartCard>
         <ChartCard
           title="Holding time analysis"
           subtitle="Win rate & P/L relative to trade duration"
         >
-          <DurationChart data={data} />
+          <DurationChart data={data} currency={currency} />
         </ChartCard>
         <ChartCard
           title="R-multiple distribution"
@@ -190,7 +239,7 @@ function BreakdownView({ data }: { data: AnalyticsBreakdown }) {
         <Card className="anim-fade-up">
           <h3 className="text-sm font-semibold">Strategy & Setup Performance</h3>
           <p className="mb-3 text-xs text-muted">Win rate and risk ratios per tagged playbook</p>
-          <StrategyTable data={data} />
+          <StrategyTable data={data} currency={currency} />
         </Card>
       </section>
     </>
@@ -281,38 +330,44 @@ const baseTooltip = {
   trigger: "axis" as const,
   axisPointer: { type: "shadow" as const },
   ...CH.tooltip,
-  valueFormatter: moneyFmt,
+  valueFormatter: (v: any) => moneyFmt(v),
 };
 
-function HourChart({ data }: { data: AnalyticsBreakdown }) {
+function HourChart({ data, currency }: { data: AnalyticsBreakdown; currency: string }) {
   const option = useMemo<EChartsOption>(
     () => ({
-      tooltip: baseTooltip,
+      tooltip: {
+        ...baseTooltip,
+        valueFormatter: (v: unknown) => moneyFmt(v, currency),
+      },
       grid: { left: 8, right: 8, top: 14, bottom: 8, containLabel: true },
       xAxis: axis.category(data.byHour.map((h) => h.key)),
       yAxis: axis.value(),
       series: [polarityBar(data.byHour.map((h) => h.pnl), "Net P/L")],
     }),
-    [data],
+    [data, currency],
   );
   return <EChart option={option} ariaLabel="Net profit and loss by hour of day" />;
 }
 
-function WeekdayChart({ data }: { data: AnalyticsBreakdown }) {
+function WeekdayChart({ data, currency }: { data: AnalyticsBreakdown; currency: string }) {
   const option = useMemo<EChartsOption>(
     () => ({
-      tooltip: baseTooltip,
+      tooltip: {
+        ...baseTooltip,
+        valueFormatter: (v: unknown) => moneyFmt(v, currency),
+      },
       grid: { left: 8, right: 8, top: 14, bottom: 8, containLabel: true },
       xAxis: axis.category(data.byWeekday.map((d) => d.key)),
       yAxis: axis.value(),
       series: [polarityBar(data.byWeekday.map((d) => d.pnl), "Net P/L")],
     }),
-    [data],
+    [data, currency],
   );
   return <EChart option={option} ariaLabel="Net profit and loss by weekday" />;
 }
 
-function SymbolChart({ data }: { data: AnalyticsBreakdown }) {
+function SymbolChart({ data, currency }: { data: AnalyticsBreakdown; currency: string }) {
   const option = useMemo<EChartsOption>(() => {
     const top = data.bySymbol.slice(0, 8);
     const rest = data.bySymbol.slice(8);
@@ -333,7 +388,7 @@ function SymbolChart({ data }: { data: AnalyticsBreakdown }) {
         formatter: (params: unknown) => {
           const p = (params as { dataIndex: number }[])[0];
           const r = ordered[p.dataIndex];
-          return `<b>${r.symbol}</b><br/>${moneyFmt(r.pnl)} · ${r.trades} trades · ${((r.wins / Math.max(1, r.trades)) * 100).toFixed(0)}% wins`;
+          return `<b>${r.symbol}</b><br/>${moneyFmt(r.pnl, currency)} · ${r.trades} trades · ${((r.wins / Math.max(1, r.trades)) * 100).toFixed(0)}% wins`;
         },
       },
       grid: { left: 8, right: 48, top: 8, bottom: 8, containLabel: true },
@@ -352,7 +407,7 @@ function SymbolChart({ data }: { data: AnalyticsBreakdown }) {
             position: "right" as const,
             color: CH.ink2,
             fontSize: 11,
-            formatter: (p: { value: unknown }) => moneyFmt(p.value),
+            formatter: (p: { value: unknown }) => moneyFmt(p.value, currency),
           },
           data: ordered.map((r) => ({
             value: r.pnl,
@@ -364,7 +419,7 @@ function SymbolChart({ data }: { data: AnalyticsBreakdown }) {
         },
       ],
     };
-  }, [data]);
+  }, [data, currency]);
   const height = Math.max(220, Math.min(9, data.bySymbol.length + 1) * 34);
   return (
     <EChart
@@ -408,7 +463,7 @@ function RRChart({ data }: { data: AnalyticsBreakdown }) {
 
 const WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function HeatmapChart({ data }: { data: AnalyticsBreakdown }) {
+function HeatmapChart({ data, currency }: { data: AnalyticsBreakdown; currency: string }) {
   const option = useMemo<EChartsOption>(() => {
     const cells = (data.heatmap ?? []).filter((c) => c.trades > 0);
     const maxAbs = Math.max(1, ...cells.map((c) => Math.abs(c.pnl)));
@@ -423,7 +478,7 @@ function HeatmapChart({ data }: { data: AnalyticsBreakdown }) {
           const [h, d, pnl] = p.value;
           const hour = String(h).padStart(2, "0");
           const n = tradeCount.get(`${WEEK[d]}-${hour}`) ?? 0;
-          return `<b>${WEEK[d]} ${hour}:00 UTC</b><br/>${moneyFmt(pnl)} · ${n} trade${n === 1 ? "" : "s"}`;
+          return `<b>${WEEK[d]} ${hour}:00 UTC</b><br/>${moneyFmt(pnl, currency)} · ${n} trade${n === 1 ? "" : "s"}`;
         },
       },
       grid: { left: 8, right: 8, top: 8, bottom: 8, containLabel: true },
@@ -466,7 +521,7 @@ function HeatmapChart({ data }: { data: AnalyticsBreakdown }) {
         },
       ],
     };
-  }, [data]);
+  }, [data, currency]);
   return (
     <EChart
       option={option}
@@ -476,11 +531,14 @@ function HeatmapChart({ data }: { data: AnalyticsBreakdown }) {
   );
 }
 
-function SessionChart({ data }: { data: AnalyticsBreakdown }) {
+function SessionChart({ data, currency }: { data: AnalyticsBreakdown; currency: string }) {
   const option = useMemo<EChartsOption>(() => {
     const ordered = [...data.bySession].reverse();
     return {
-      tooltip: baseTooltip,
+      tooltip: {
+        ...baseTooltip,
+        valueFormatter: (v: unknown) => moneyFmt(v, currency),
+      },
       grid: { left: 8, right: 48, top: 8, bottom: 8, containLabel: true },
       xAxis: axis.value(),
       yAxis: {
@@ -497,7 +555,7 @@ function SessionChart({ data }: { data: AnalyticsBreakdown }) {
             position: "right" as const,
             color: CH.ink2,
             fontSize: 11,
-            formatter: (p: { value: unknown }) => moneyFmt(p.value),
+            formatter: (p: { value: unknown }) => moneyFmt(p.value, currency),
           },
           data: ordered.map((r) => ({
             value: r.pnl,
@@ -509,14 +567,17 @@ function SessionChart({ data }: { data: AnalyticsBreakdown }) {
         },
       ],
     };
-  }, [data]);
+  }, [data, currency]);
   return <EChart option={option} height={200} ariaLabel="Net profit and loss by market session" />;
 }
 
-function DurationChart({ data }: { data: AnalyticsBreakdown }) {
+function DurationChart({ data, currency }: { data: AnalyticsBreakdown; currency: string }) {
   const option = useMemo<EChartsOption>(
     () => ({
-      tooltip: baseTooltip,
+      tooltip: {
+        ...baseTooltip,
+        valueFormatter: (v: unknown) => moneyFmt(v, currency),
+      },
       grid: { left: 8, right: 8, top: 14, bottom: 8, containLabel: true },
       xAxis: axis.category(data.byDuration.map((d) => d.bucket)),
       yAxis: axis.value(),
@@ -535,12 +596,12 @@ function DurationChart({ data }: { data: AnalyticsBreakdown }) {
         },
       ],
     }),
-    [data],
+    [data, currency],
   );
   return <EChart option={option} height={220} ariaLabel="Net profit and loss by holding duration" />;
 }
 
-function StrategyTable({ data }: { data: AnalyticsBreakdown }) {
+function StrategyTable({ data, currency }: { data: AnalyticsBreakdown; currency: string }) {
   const all = useMemo(() => {
     const list: { name: string; type: "Strategy" | "Setup"; pnl: number; trades: number; wins: number; avgRR: number | null }[] = [];
     data.byStrategy.forEach((s) => list.push({ name: s.name, type: "Strategy", pnl: s.pnl, trades: s.trades, wins: s.wins, avgRR: s.avgRR }));
@@ -584,7 +645,7 @@ function StrategyTable({ data }: { data: AnalyticsBreakdown }) {
               <td className="px-2 py-2 text-right">{fmtNum(item.avgRR)}</td>
               <td className="px-2 py-2 text-right text-ink-2">{item.trades}</td>
               <td className={clsx("px-4 py-2 text-right font-semibold", item.pnl > 0 && "text-good", item.pnl < 0 && "text-bad")}>
-                {fmtSigned(item.pnl)}
+                {fmtSigned(item.pnl, currency)}
               </td>
             </tr>
           ))}

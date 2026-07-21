@@ -4,14 +4,20 @@ export const CONVEX_URL =
 export const EA_API_URL =
   process.env.NEXT_PUBLIC_CONVEX_SITE_URL ?? "https://careful-duck-681.convex.site";
 
-export const fmtMoney = (n: number | null | undefined, currency = "USD") =>
-  n == null
-    ? "—"
-    : new Intl.NumberFormat("en-US", {
+export const fmtMoney = (n: number | null | undefined, currency = "USD") => {
+  if (n == null) return "—";
+  try {
+    const isIso = /^[A-Z]{3}$/i.test(currency);
+    if (isIso) {
+      return new Intl.NumberFormat("en-US", {
         style: "currency",
-        currency,
+        currency: currency.toUpperCase(),
         maximumFractionDigits: 2,
       }).format(n);
+    }
+  } catch (e) {}
+  return `${n.toFixed(2)} ${currency}`;
+};
 
 export const fmtSigned = (n: number | null | undefined, currency = "USD") =>
   n == null ? "—" : (n > 0 ? "+" : "") + fmtMoney(n, currency);

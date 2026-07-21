@@ -14,9 +14,9 @@
   --color-accent: #3987e5; /* series slot 1 (blue, dark step) */
   --color-accent-deep: #1c5cab;
   --color-series-2: #008300; /* series slot 2 (green) */
-  --color-good: #0ca30c; /* delta up / success text (dark) */
+  --color-good: #00e676; /* delta up / success text (neon green) */
   --color-warn: #fab219; /* status warning (dark surface) */
-  --color-bad: #d03b3b; /* critical / delta down */
+  --color-bad: #dc2626; /* critical / delta down (deep red) */
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -166,8 +166,11 @@ body {
   animation: pulse-dot 2s ease-out infinite;
 }
 
-/* ---- Landing FX ---- */
-.reveal {
+/* ---- Landing FX ----
+   Content is visible by default. The hidden initial state is applied ONLY when
+   JS is confirmed active (`.js` on <html>, set before paint), so a broken or
+   disabled client can never leave the page blank — it just skips the animation. */
+.js .reveal {
   opacity: 0;
   transform: translateY(28px);
   filter: blur(8px);
@@ -177,7 +180,7 @@ body {
     filter 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   transition-delay: var(--reveal-delay, 0ms);
 }
-.reveal.is-visible {
+.js .reveal.is-visible {
   opacity: 1;
   transform: none;
   filter: none;
@@ -274,7 +277,7 @@ body {
   .text-gradient-animated {
     animation: none;
   }
-  .reveal {
+  .js .reveal {
     opacity: 1;
     transform: none;
     filter: none;

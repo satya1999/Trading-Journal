@@ -21,7 +21,26 @@ export function Reveal({
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el) {
+      setVisible(true);
+      return;
+    }
+
+    // If IntersectionObserver is unavailable, don't hide content behind it.
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+
+    // Anything already within (or above) the viewport on mount reveals now —
+    // covers above-the-fold content without waiting on an observer callback,
+    // and sidesteps threshold quirks for elements taller than the viewport.
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      setVisible(true);
+      return;
+    }
+
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -29,10 +48,17 @@ export function Reveal({
           io.disconnect();
         }
       },
-      { threshold: 0.15, rootMargin: "0px 0px -40px 0px" },
+      { threshold: 0, rootMargin: "0px 0px -10% 0px" },
     );
     io.observe(el);
-    return () => io.disconnect();
+
+    // Safety net: never let content stay invisible if the observer misfires.
+    const failsafe = window.setTimeout(() => setVisible(true), 1200);
+
+    return () => {
+      io.disconnect();
+      window.clearTimeout(failsafe);
+    };
   }, []);
 
   return (

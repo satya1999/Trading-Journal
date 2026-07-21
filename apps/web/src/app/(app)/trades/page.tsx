@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -34,6 +34,10 @@ export default function TradesPage() {
     pageSize: 25,
   });
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+
+  const getTradeCurrency = (tradeAccountId: string) => {
+    return accounts?.find((a) => a.id === tradeAccountId)?.currency ?? "USD";
+  };
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -149,7 +153,7 @@ export default function TradesPage() {
                       t.netProfit < 0 && "text-bad",
                     )}
                   >
-                    {fmtSigned(t.netProfit)}
+                    {fmtSigned(t.netProfit, getTradeCurrency(t.accountId))}
                   </td>
                   <td className="px-2 py-2.5 text-ink-2">
                     {fmtDuration(t.durationSec)}
@@ -189,7 +193,11 @@ export default function TradesPage() {
       )}
 
       {selected && (
-        <TradeDrawer trade={selected} onClose={() => setSelected(null)} />
+        <TradeDrawer
+          trade={selected}
+          currency={getTradeCurrency(selected.accountId)}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   );
@@ -206,9 +214,11 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 function TradeDrawer({
   trade,
+  currency,
   onClose,
 }: {
   trade: TradeDto;
+  currency: string;
   onClose: () => void;
 }) {
   const [note, setNote] = useState(trade.note?.note ?? "");
@@ -270,20 +280,20 @@ function TradeDrawer({
               trade.netProfit < 0 && "text-bad",
             )}
           >
-            {fmtSigned(trade.netProfit)}
+            {fmtSigned(trade.netProfit, currency)}
           </p>
         </div>
 
         <div className="mb-6 rounded-xl border bg-black/25 px-4 py-2">
           <Row label="Volume" value={`${trade.volume} lots`} />
           <Row label="Entry" value={trade.entryPrice} />
-          <Row label="Exit" value={trade.exitPrice ?? "â€”"} />
-          <Row label="Stop loss" value={trade.sl ?? "â€”"} />
-          <Row label="Take profit" value={trade.tp ?? "â€”"} />
+          <Row label="Exit" value={trade.exitPrice ?? "—"} />
+          <Row label="Stop loss" value={trade.sl ?? "—"} />
+          <Row label="Take profit" value={trade.tp ?? "—"} />
           <Row label="Pips" value={fmtNum(trade.pips, 1)} />
           <Row label="R multiple" value={fmtNum(trade.rr)} />
-          <Row label="Commission" value={fmtSigned(trade.commission)} />
-          <Row label="Swap" value={fmtSigned(trade.swap)} />
+          <Row label="Commission" value={fmtSigned(trade.commission, currency)} />
+          <Row label="Swap" value={fmtSigned(trade.swap, currency)} />
           <Row label="Duration" value={fmtDuration(trade.durationSec)} />
           <Row label="Opened" value={new Date(trade.openTime).toLocaleString()} />
           <Row
